@@ -1,115 +1,153 @@
-import json
 import logging
-import os
 import ast
-
 from sqlalchemy import create_engine
-
 from langchain_community.utilities import SQLDatabase
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains import create_sql_query_chain
 
 logger = logging.getLogger(__name__)
 
 
 class SupaChatAgent:
     def __init__(self, db_uri: str):
-        self.db_uri = db_uri
         self.engine = create_engine(db_uri)
+        self.db = SQLDatabase(
+            self.engine,
+            include_tables=["articles", "pageviews", "engagement"]
+        )
 
-        try:
-            self.db = SQLDatabase(
-                self.engine,
-                include_tables=["articles", "pageviews", "engagement"]
-            )
+    # =========================
+    # 🔧 HELPER FUNCTION
+    # =========================
 
-            # ✅ FIXED Gemini model
-            self.llm = ChatGoogleGenerativeAI(
-                model="gemini-1.0-pro",
-                google_api_key=os.getenv("GOOGLE_API_KEY"),
-                temperature=0,
-            
-            )
+    def format_table(self, columns, rows):
+        return [dict(zip(columns, row)) for row in rows]
 
-        except Exception as e:
-            logger.error(f"Error initializing DB or LLM: {e}")
-            self.db = None
-            self.llm = None
+    # =========================
+    # 🔧 MCP TOOLS
+    # =========================
+
+    def get_all_articles(self):
+        query = "SELECT id, title, topic, author, created_at FROM articles LIMIT 5;"
+        result = self.db.run(query)
+
+        rows = ast.literal_eval(result)
+        columns = ["id", "title", "topic", "author", "created_at"]
+
+        return self.format_table(columns, rows)
+
+    def count_articles(self):
+        result = self.db.run("SELECT COUNT(*) FROM articles;")
+        rows = ast.literal_eval(result)
+
+        return rows[0][0]
+
+    def trending_topics(self):
+        query = """
+        SELECT topic, COUNT(*) as count
+        FROM articles
+        GROUP BY topic
+        ORDER BY count DESC
+        LIMIT 5;
+        """
+        result = self.db.run(query)
+
+        rows = ast.literal_eval(result)
+        columns = ["topic", "count"]
+
+        return self.format_table(columns, rows)
+
+    def engagement_by_topic(self):
+        query = """
+        SELECT topic, SUM(engagement) as total_engagement
+        FROM engagement
+        GROUP BY topic
+        ORDER BY total_engagement DESC;
+        """
+        result = self.db.run(query)
+
+        rows = ast.literal_eval(result)
+        columns = ["topic", "total_engagement"]
+
+        return self.format_table(columns, rows)
+
+    def daily_views(self):
+        query = """
+        SELECT date, SUM(views) as views
+        FROM pageviews
+        GROUP BY date
+        ORDER BY date;
+        """
+        result = self.db.run(query)
+
+        rows = ast.literal_eval(result)
+        columns = ["date", "views"]
+
+        return self.format_table(columns, rows)
+
+    # =========================
+    # 🧠 MCP AGENT (ROUTER)
+    # =========================
 
     def run_query(self, user_query: str) -> dict:
-        if not self.db or not self.llm:
-            raise ValueError(
-                "Agent not initialized properly (check DB connection and GOOGLE_API_KEY)."
-            )
+        query = user_query.lower()
 
         try:
-            # 🔹 Step 1: Generate SQL
-            chain = create_sql_query_chain(self.llm, self.db)
-            sql_query = chain.invoke({"question": user_query})
+            if "all articles" in query:
+                result = self.get_all_articles()
+                return {
+                    "type": "table",
+                    "content": "Showing latest articles",
+                    "data": result
+                }
 
-            # Clean SQL output
-            if isinstance(sql_query, str):
-                if sql_query.startswith("```sql"):
-                    sql_query = sql_query[6:-3].strip()
-                if sql_query.startswith("SQLQuery:"):
-                    sql_query = sql_query[9:].strip()
+            elif "count" in query or "how many" in query:
+                result = self.count_articles()
+                return {
+                    "type": "text",
+                    "content": f"Total articles: {result}",
+                    "data": []
+                }
 
-            print("SQL GENERATED:", sql_query)
+            elif "trending" in query:
+                result = self.trending_topics()
+                return {
+                    "type": "barchart",
+                    "content": "Trending topics",
+                    "data": result,
+                    "xAxis": "topic",
+                    "yAxis": "count"
+                }
 
-            # 🔹 Step 2: Execute SQL
-            result_str = self.db.run(sql_query)
-            print("DB RESULT:", result_str)
+            elif "engagement" in query:
+                result = self.engagement_by_topic()
+                return {
+                    "type": "barchart",
+                    "content": "Engagement by topic",
+                    "data": result,
+                    "xAxis": "topic",
+                    "yAxis": "total_engagement"
+                }
 
-            try:
-                result_data = ast.literal_eval(result_str)
-            except Exception:
-                result_data = [{"raw": result_str}]
+            elif "views" in query or "trend" in query:
+                result = self.daily_views()
+                return {
+                    "type": "linechart",
+                    "content": "Daily views trend",
+                    "data": result,
+                    "xAxis": "date",
+                    "yAxis": "views"
+                }
 
-            # 🔹 Step 3: Format response using LLM
-            format_prompt = f"""
-You are a data formatting assistant.
-
-User query: "{user_query}"
-SQL executed: {sql_query}
-Raw result: {result_str}
-
-Format into JSON:
-
-{{
-    "type": "text" | "table" | "barchart" | "linechart",
-    "content": "<insight>",
-    "data": [{{}}],
-    "xAxis": "<x-axis key or null>",
-    "yAxis": "<y-axis key or null>"
-}}
-
-Rules:
-- Use "linechart" for trends/time
-- Use "barchart" for comparisons
-- Use "table" for lists
-- Clean column names
-- Output ONLY valid JSON
-"""
-
-            response = self.llm.invoke(format_prompt)
-
-            # Handle Gemini response safely
-            if hasattr(response, "content"):
-                content = response.content
             else:
-                content = str(response)
-
-            print("LLM RESPONSE:", content)
-
-            if "```json" in content:
-                content = content.split("```json")[-1].split("```")[0].strip()
-
-            return json.loads(content)
+                return {
+                    "type": "text",
+                    "content": "Sorry, I could not understand the query.",
+                    "data": []
+                }
 
         except Exception as e:
-            logger.error(f"Error in run_query: {e}")
+            logger.error(f"Error: {e}")
             return {
                 "type": "text",
-                "content": f"Error fulfilling query: {str(e)}",
+                "content": f"Error: {str(e)}",
                 "data": []
             }

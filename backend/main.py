@@ -6,10 +6,12 @@ from dotenv import load_dotenv
 
 from llm_agent import SupaChatAgent
 
+# Load env
 load_dotenv()
 
 app = FastAPI(title="SupaChat API", version="1.0.0")
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -18,13 +20,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# DB connection
 db_uri = os.getenv(
     "DATABASE_URL",
     "postgresql://postgres:password@db:5432/supachat"
 )
 
+# MCP Agent
 agent = SupaChatAgent(db_uri=db_uri)
 
+
+# =========================
+# REQUEST/RESPONSE MODELS
+# =========================
 
 class ChatRequest(BaseModel):
     message: str
@@ -38,22 +46,39 @@ class ChatResponse(BaseModel):
     yAxis: str | None = None
 
 
+# =========================
+# HEALTH CHECK
+# =========================
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "message": "SupaChat Backend is running."}
 
 
+# =========================
+# MAIN API (MCP FIRST)
+# =========================
+
 @app.post("/api/chat", response_model=ChatResponse)
 def process_chat(request: ChatRequest):
     try:
-        # 🔥 ALWAYS USE DUMMY (NO API)
-        return dummy_response(request.message)
+        # ✅ Try MCP agent first
+        response = agent.run_query(request.message)
+
+        # If MCP fails or gives empty → fallback
+        if not response or response.get("type") == "text" and "Error" in response.get("content", ""):
+            return dummy_response(request.message)
+
+        return response
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return dummy_response(request.message)
 
 
-# ✅ DUMMY RESPONSES
+# =========================
+# DUMMY FALLBACK (SAFE MODE)
+# =========================
+
 def dummy_response(message: str) -> dict:
     msg = message.lower()
 
@@ -69,7 +94,7 @@ def dummy_response(message: str) -> dict:
             ],
             "xAxis": "date",
             "yAxis": "views",
-            "content": "Trend of blog views over last 5 days (Demo Data)"
+            "content": "Trend of blog views over last 5 days (Demo Data - fallback)"
         }
 
     elif "compare" in msg or "topic" in msg:
@@ -82,7 +107,7 @@ def dummy_response(message: str) -> dict:
             ],
             "xAxis": "topic",
             "yAxis": "articles",
-            "content": "Articles comparison by topic (Demo Data)"
+            "content": "Articles comparison by topic (Demo Data - fallback)"
         }
 
     elif "top" in msg:
@@ -92,7 +117,7 @@ def dummy_response(message: str) -> dict:
                 {"title": "The Rise of AI", "views": 1500},
                 {"title": "Next.js Tips", "views": 1200},
             ],
-            "content": "Top performing articles (Demo Data)"
+            "content": "Top performing articles (Demo Data - fallback)"
         }
 
     else:

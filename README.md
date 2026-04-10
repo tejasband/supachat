@@ -1,3 +1,4 @@
+
 # SupaChat 🚀
 
 SupaChat is a conversational analytics app built on top of PostgreSQL, FastAPI, and Next.js. It leverages LLMs to translate natural language into SQL queries, providing dynamic data visualizations (Recharts) automatically.
@@ -37,3 +38,4 @@ source venv/bin/activate # Mac/Linux
 1. "Show top trending topics in last 30 days"
 2. "Compare article engagement by topic"
 3. "Plot daily views trend for AI articles"
+

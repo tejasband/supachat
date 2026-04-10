@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from llm_agent import SupaChatAgent
 
@@ -10,6 +11,7 @@ from llm_agent import SupaChatAgent
 load_dotenv()
 
 app = FastAPI(title="SupaChat API", version="1.0.0")
+Instrumentator().instrument(app).expose(app)
 
 # CORS
 app.add_middleware(

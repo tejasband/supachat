@@ -7,7 +7,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from llm_agent import SupaChatAgent
 
-# Load env
+# Load env1
 load_dotenv()
 
 app = FastAPI(title="SupaChat API", version="1.0.0")

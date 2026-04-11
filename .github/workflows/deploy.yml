@@ -18,6 +18,19 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd supachat
-            git pull
-            docker-compose down
+
+            # Stop any system nginx using port 80
+            sudo systemctl stop nginx || true
+            sudo systemctl stop apache2 || true
+
+            # Clean docker completely (prevents disk + port issues)
+            docker-compose down || true
+            docker rm -f $(docker ps -aq) || true
+            docker system prune -af || true
+
+            # Always sync latest code
+            git fetch origin
+            git reset --hard origin/main
+
+            # Start fresh
             docker-compose up -d --build

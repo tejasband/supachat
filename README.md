@@ -2,12 +2,11 @@
 
 SupaChat is a full-stack conversational analytics application that converts natural language queries into structured insights and visualizes them using charts.
 
-This project demonstrates real-world DevOps practices including containerization, CI/CD, monitoring, and logging.
+This project demonstrates a complete **DevOps lifecycle** including containerization, CI/CD automation, monitoring, and logging.
 
 ---
 
 ## 🔥 Features
-
 - Natural language → analytics queries
 - Dynamic chart generation (line, bar, table)
 - Full-stack architecture (FastAPI + Next.js)
@@ -20,39 +19,38 @@ This project demonstrates real-world DevOps practices including containerization
 
 ## 🏗️ Architecture
 
-The system follows a microservices-based architecture:
-
-- **Frontend:** Next.js (React UI)
-- **Backend:** FastAPI (Python API)
-- **Database:** PostgreSQL
-- **Containerization:** Docker & Docker Compose
-- **Reverse Proxy:** Nginx
-- **CI/CD:** GitHub Actions
-- **Monitoring Stack:**
-  - Prometheus (metrics)
-  - Grafana (visualization)
-  - Node Exporter (system metrics)
-- **Logging Stack:**
-  - Loki (log aggregation)
-  - Promtail (log collection)
+### 🔹 Tech Stack
+- **Frontend**: Next.js
+- **Backend**: FastAPI
+- **Database**: PostgreSQL
+- **Reverse Proxy**: Nginx
+- **Containerization**: Docker & Docker Compose
+- **CI/CD**: GitHub Actions
+- **Cloud**: AWS EC2
 
 ---
 
-## 🧠 AI & Development Tools Used
+### 🔹 Monitoring Stack
+- Prometheus → metrics collection  
+- Grafana → dashboards & visualization  
+- Node Exporter → system metrics  
 
-- Antigravity (vibe coding) – rapid full-stack development
-- ChatGPT – debugging, architecture planning, DevOps guidance
-- GitHub Copilot – code suggestions
-- Docker – containerization
-- Grafana + Prometheus – monitoring
+---
 
-AI tools were used to accelerate development while maintaining production-level structure.
+### 🔹 Logging Stack
+- Loki → log aggregation  
+- Promtail → log collection  
 
-## ⚙️ Setup
+---
 
-### 1️⃣ Clone Repository
+## 🌐 Live Application
+👉 http://13.126.242.36
+
+---
+
+## ⚙️ Setup Instructions
 
 ```bash
 git clone https://github.com/<your-username>/supachat.git
 cd supachat
-
+docker-compose up --build
